@@ -51,6 +51,8 @@ MyObject eeprom;
 #define autocontinue 0 // Always 0
 #define count 2
 
+unsigned long tempPrevMillis = 0;
+
 void setup() {
   pinMode(ch1, INPUT);
   pinMode(ch2, INPUT);
@@ -59,58 +61,56 @@ void setup() {
   Serial1.begin(57600); //RXTX from Pixhawk (Port 19,18 Arduino Mega)
   Serial.begin(57600); //Main serial port for console output
   
-   //Variable to store custom object read from EEPROM.
   EEPROM.get(0, eeprom);
   mission_count();
 
-  while (x == 0.0)
-  {
-    Serial.print(".");
-    MavLink_receive();
-    blink(1);
-    delay(400);
+  while (x == 0.0){
+    unsigned long tempMillis = millis();
+    if((tempMillis - tempPrevMillis) >= 500){
+      tempPrevMillis = tempMillis;  // Remember the time
+      Serial.print(".");
+      MavLink_receive();
+      blink(1);
+    }
   }
-  printXYZ();
   blink(2);
   beep(2);
   printAllPoints();
-  //Serial.print(wpCH); Serial.print(" "); Serial.println(saveCH);
 
 }
 
 void loop() {
-  blink(2);
-  getSwState();
-  if (wpCH != startCH1) {
-    EEPROM.get( 0, eeprom );
-    writeWP();
-    startCH1 = wpCH;
-    blink(1);
-    beep(1);
-    printAllPoints();
+  unsigned long tempMillis = millis();
+  if((tempMillis - tempPrevMillis) > 400){
+      tempPrevMillis = tempMillis;
+      blink(2);
+      getSwState();
+      if (wpCH != startCH1) {
+        EEPROM.get( 0, eeprom );
+        writeWP();
+        startCH1 = wpCH;
+        blink(1);
+        beep(1);
+        printAllPoints();
+      }
+      if (saveCH > 1) {
+        Serial.println("Get");
+        EEPROM.get( 0, eeprom );
+        MavLink_receive();
+        saveWaipoint();
+        writeWP();
+        blink(2);
+        beep(2);
+      }
   }
-  if (saveCH > 1) {
-    Serial.println("Get");
-    EEPROM.get( 0, eeprom );
-    MavLink_receive();
-    saveWaipoint();
-    writeWP();
-    blink(2);
-    beep(2);
-  }
-
-  delay(400);
 }
 
 void writeWP() {
-
-  //printAllPoints();
   mission_count();
   while (temp < 1) {
     MavLink_receive2();
   }
   temp = 0;
-
 }
 
 void MavLink_receive() {
@@ -135,7 +135,6 @@ void MavLink_receive() {
 }
 
 void MavLink_receive2(){
-//mission_count();
 
   mavlink_message_t msg;
   mavlink_status_t status;
@@ -164,7 +163,6 @@ void MavLink_receive2(){
           }
           break;
       }
-      //Serial.println(c);
     }
   }
 
@@ -197,13 +195,12 @@ void mission_count() {
 }
 
 void getSwState() {
-  //Serial1.end();
+
   noInterrupts();
   wpCHRaw = pulseIn(ch1, HIGH, 25000);
-
   svpCHRaw = pulseIn(ch2, HIGH, 25000);
   interrupts();
-  //Serial1.begin(57600);
+
   for (int i = 0; i < 2; i++) {
     if ((svpCHRaw - svArray[i]) < rangeCH) {
       saveCH = i + 1;
@@ -217,10 +214,7 @@ void getSwState() {
       break;
     }
   }
-
   Serial.println(wpCH);
-  //Serial.println(saveCH);
-
 }
 
 void saveWaipoint() {
@@ -237,10 +231,6 @@ void printAllPoints() {
     }
     Serial.println();
   }
-}
-
-void printXYZ() {
-  Serial.print(x, 7); Serial.print(" "); Serial.print(y, 7); Serial.print(" "); Serial.println(z, 0);
 }
 
 void beep(byte num){
