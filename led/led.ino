@@ -24,7 +24,6 @@ delay(5000);
 
 void doDigital(byte pin,byte num){
   for (int i = 0; i < num; i++){
-    Serial.println(i);
     ledMillis = millis();
     while((millis() - ledMillis < OffTime)){
       digitalWrite(pin, HIGH);

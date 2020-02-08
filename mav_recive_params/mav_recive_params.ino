@@ -23,24 +23,19 @@ MavLink_receive();
 void MavLink_receive()
   { 
   mavlink_message_t msg;
-  Serial.print("1");
   mavlink_status_t status;
-  Serial.print("2");
+
   while(Serial1.available())
   {
     uint8_t c= Serial1.read();
-    Serial.print("3");
     //Get new message
     if(mavlink_parse_char(MAVLINK_COMM_0, c, &msg, &status))
     {
-   Serial.print("4");
     //Handle new message from autopilot
       switch(msg.msgid)
       {
-   Serial.print("5");
         case MAVLINK_MSG_ID_GPS_RAW_INT:
       {
-          Serial.print("6");
         mavlink_gps_raw_int_t packet;
         mavlink_msg_gps_raw_int_decode(&msg, &packet);
         
