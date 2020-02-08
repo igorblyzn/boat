@@ -4,12 +4,36 @@
 #define RXpin 2
 #define TXpin 3
 SoftwareSerial Serial1(RXpin, TXpin); // sets up serial communication on pins 3 and 2
+int sysid = 255;//GCS                   ///< ID 20 for this airplane. 1 PX, 255 ground station
+int compid = 190;//Mission Planner                ///< The component sending the message
+int type = MAV_TYPE_QUADROTOR;   ///< This system is an airplane / fixed wing
+
+// Define the system type, in this case an airplane -> on-board controller
+uint8_t system_type = MAV_TYPE_GENERIC;
+uint8_t autopilot_type = MAV_AUTOPILOT_GENERIC;
+
+// Hardware definitions
+uint8_t system_mode = MAV_MODE_TEST_ARMED; /// /* UNDEFINED mode. This solely depends on the autopilot - use with caution, intended for developers only. | */
+uint32_t custom_mode = MAV_MODE_FLAG_SAFETY_ARMED; ///< Custom mode, can be defined by user/adopter
+uint8_t system_state = MAV_STATE_STANDBY; ///< System ready for flight
+
+// Mavlink variables
+unsigned long previousMillisMAVLink = 0;     // will store last time MAVLink was transmitted and listened
+unsigned long next_interval_MAVLink = 1000;  // next interval to count
+const int num_hbs = 60;                      // # of heartbeats to wait before activating STREAMS from APM. 60 = one minute.
+int num_hbs_past = num_hbs;
  
 void setup() {
   Serial1.begin(57600); //RXTX from Pixhawk (Port 19,18 Arduino Mega)
   Serial.begin(57600); //Main serial port for console output
  
-request_datastream();
+  mavlink_message_t msg;
+  uint8_t buf[MAVLINK_MAX_PACKET_LEN];
+  
+  // Pack the message
+  mavlink_msg_heartbeat_pack(255,0, &msg, type, autopilot_type, system_mode, custom_mode, system_state);
+  uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
+  Serial1.write(buf, len);
  
 }
  
@@ -20,38 +44,70 @@ MavLink_receive();
 }
  
 //function called by arduino to read any MAVlink messages sent by serial communication from flight controller to arduino
-void MavLink_receive()
-  { 
+void MavLink_receive(){
   mavlink_message_t msg;
   mavlink_status_t status;
- 
-  while(Serial1.available())
-  {
-    uint8_t c= Serial1.read();
- 
-    //Get new message
-    if(mavlink_parse_char(MAVLINK_COMM_0, c, &msg, &status))
-    {
- 
-    //Handle new message from autopilot
-      switch(msg.msgid)
-      {
- 
-        case MAVLINK_MSG_ID_GLOBAL_POSITION_INT:
-      {
-        mavlink_global_position_int_t packet;
-        mavlink_msg_global_position_int_decode(&msg, &packet);
+
+  //Indicates no data input
+  digitalWrite(LED_BUILTIN, LOW);
+
+  //Checks if drone is connected
+  while(Serial1.available()) {
+    uint8_t c = Serial1.read();
+    //Indicates data receive frequency
+    digitalWrite(LED_BUILTIN, HIGH);
         
-        //Serial.print("\nGPS Fix: ");Serial.println(packet.fix_type);
-        Serial.print("GPS Latitude: ");Serial.println(packet.lat);
-        Serial.print("GPS Longitude: ");Serial.println(packet.lon);
-        Serial.print("GPS altitude: ");Serial.println(packet.alt);
-        Serial.print("GPS altitude2: ");Serial.println(packet.relative_alt);
-        Serial.print("GPS Speed: ");Serial.println(packet.vx);
-        //Serial.print("Sats Visible: ");Serial.println(packet.satellites_visible);
-       
-      }
-      break;
+    // Try to get a new message
+    if(mavlink_parse_char(MAVLINK_COMM_0, c, &msg, &status)) {
+      //Indicates data flow
+      Serial.println("+");
+      // Handle message
+      switch(msg.msgid) {
+        case MAVLINK_MSG_ID_HEARTBEAT:  // #0: Heartbeat
+          {
+            // E.g. read GCS heartbeat and go into
+            // comm lost mode if timer times out
+            //Serial.println("MAVLINK_MSG_ID_HEARTBEAT");
+            mavlink_heartbeat_t hb;
+            mavlink_msg_heartbeat_decode(&msg, &hb);
+            Serial.print("State: "); Serial.println(hb.base_mode == 209 ? "Armed" : "Disarmed");
+            Serial.print("Mode: ");
+            switch(hb.custom_mode) {
+              case 0:
+                Serial.println("Stabilize");
+              break;
+              case 1:
+                Serial.println("11111");
+              break;
+              case 2:
+                Serial.println("AltHold");
+              break;
+              case 3:
+                Serial.println("Auto");
+              break;
+              case 4:
+                Serial.println("444444444");
+              break;
+              case 5:
+                Serial.println("Loiter");
+              break;
+              case 6:
+                Serial.println("6666666666");
+              break;
+              case 7:
+                Serial.println("Circle");
+              break;
+              default:
+                Serial.println("Mode not known");
+              break;
+            }
+            //Stablize = 0
+            //AltHold = 2
+            //Auto = 3
+            //Loiter = 5
+            //Circle = 7
+          }
+          break;
  
       }
     }
