@@ -1,5 +1,6 @@
 #include <mavlink.h>
 #include <SoftwareSerial.h>
+#include <EEPROM.h>
 #define pibBuzzer 4
 #define RXpin 2
 #define TXpin 3
@@ -25,7 +26,11 @@ int chArray[9] = {900, 1000, 1200, 1300, 1450, 1750, 1800, 1900, 2020};
 int svArray[2] = {900, 2020};
 #define rangeCH 70
 
-float xyz[9][3] =
+struct MyObject{
+  float xyz[9][3];
+};
+MyObject eeprom;
+/*float xyz[9][3] =
 {
   {48.0066137, 35.1016483, 10},
   {48.0066137, 35.1016483, 10},
@@ -36,7 +41,7 @@ float xyz[9][3] =
   {48.0066137, 35.1016483, 10},
   {48.0066137, 35.1016483, 10},
   {48.1066137, 35.0086483, 30}
-};
+};*/
 /*
   float x = 48.0066137; // Latitude - degrees
   float y = 35.1086483; // Longitude - degrees
@@ -59,7 +64,9 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   Serial1.begin(57600); //RXTX from Pixhawk (Port 19,18 Arduino Mega)
   Serial.begin(57600); //Main serial port for console output
-
+  
+   //Variable to store custom object read from EEPROM.
+  EEPROM.get(0, eeprom);
   mission_count();
 
   while (x == 0.0)
@@ -81,6 +88,7 @@ void loop() {
   blink(400);
   getSwState();
   if (wpCH != startCH1) {
+    EEPROM.get( 0, eeprom );
     writeWP();
     startCH1 = wpCH;
     blink(30);
@@ -91,6 +99,7 @@ void loop() {
   }
   if (saveCH > 1) {
     Serial.println("Get");
+    EEPROM.get( 0, eeprom );
     MavLink_receive();
     saveWaipoint();
     writeWP();
@@ -175,7 +184,7 @@ void create_home() {
   uint16_t seq = 0; // Sequence number
   mavlink_message_t msg;
   uint8_t buf[MAVLINK_MAX_PACKET_LEN];
-  mavlink_msg_mission_item_pack(_system_id, _component_id, &msg, _target_system, _target_component, seq, frame, command, current, autocontinue, 0, 0, 0, 0, xyz[0][0], xyz[0][1], xyz[0][2]);
+  mavlink_msg_mission_item_pack(_system_id, _component_id, &msg, _target_system, _target_component, seq, frame, command, current, autocontinue, 0, 0, 0, 0, eeprom.xyz[0][0], eeprom.xyz[0][1], eeprom.xyz[0][2]);
   uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
   Serial1.write(buf, len);
 }
@@ -184,7 +193,7 @@ void create_waypoint() {
   uint16_t seq = 1; // Sequence number
   mavlink_message_t msg;
   uint8_t buf[MAVLINK_MAX_PACKET_LEN];
-  mavlink_msg_mission_item_pack(_system_id, _component_id, &msg, _target_system, _target_component, seq, frame, command, current, autocontinue, 0, 0, 0, 0, xyz[wpCH][0], xyz[wpCH][1], xyz[wpCH][2]);
+  mavlink_msg_mission_item_pack(_system_id, _component_id, &msg, _target_system, _target_component, seq, frame, command, current, autocontinue, 0, 0, 0, 0, eeprom.xyz[wpCH][0], eeprom.xyz[wpCH][1], eeprom.xyz[wpCH][2]);
   uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
   Serial1.write(buf, len);
 }
@@ -225,15 +234,16 @@ void getSwState() {
 }
 
 void saveWaipoint() {
-  xyz[wpCH - 1][0] = x;
-  xyz[wpCH - 1][1] = y;
-  xyz[wpCH - 1][2] = z;
+  eeprom.xyz[wpCH - 1][0] = x;
+  eeprom.xyz[wpCH - 1][1] = y;
+  eeprom.xyz[wpCH - 1][2] = z;
+  EEPROM.put(0, eeprom);
 }
 
 void printAllPoints() {
   for (int i = 0; i < 9; i++) {
     for (int j = 0; j < 3; j++) {
-      Serial.print(xyz[i][j]); Serial.print(" ");
+      Serial.print(eeprom.xyz[i][j]); Serial.print(" ");
     }
     Serial.println();
   }

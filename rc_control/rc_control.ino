@@ -1,10 +1,10 @@
 int waypointCH;
 int saveCH;
-#define ch1 6
-#define ch2 7
+#define ch1 8
+#define ch2 9
 int CH1 = 900;
 int CH5 = 1450;
-int chArray[9] = {900, 1000, 1200, 1200, 1450, 1750, 1700, 1800, 2020};
+int chArray[9] = {900, 1000, 1200, 1300, 1450, 1750, 1800, 1900, 2020};
 int svArray[2] = {900, 2020};
 #define CH9 2050
 int rangeCH = 70;
