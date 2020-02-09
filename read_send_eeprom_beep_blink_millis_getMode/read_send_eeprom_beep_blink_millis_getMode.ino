@@ -4,8 +4,8 @@
 
 /* digital OUTPUT */
 
-#define buzzer 4
-#define led 10//LED_BUILTIN
+#define buzzer 5
+#define led 11//LED_BUILTIN
 unsigned long digitalMillis;
 #define OnTime 500
 #define OffTime 200  
@@ -21,9 +21,11 @@ byte wpCH = 1;
 byte saveCH = 0;
 int wpCHRaw;
 int svpCHRaw;
+int ledCHRaw;
 
 #define ch1 8
 #define ch2 9
+#define ch3 10
 
 byte startCH1 = 0;
 byte startCH2 = 0;
@@ -58,11 +60,16 @@ unsigned long tempModePrevMillis = 0;
 byte ee = 1;
 unsigned long ledMillis;
 
+byte sats = 0;
+
 void setup() {
   pinMode(ch1, INPUT);
   pinMode(ch2, INPUT);
+  pinMode(ch3, INPUT);
   pinMode(buzzer, OUTPUT);
   pinMode(led, OUTPUT);
+  delay(1000);
+  beep(1);
   Serial1.begin(57600); //RXTX from Pixhawk (Port 19,18 Arduino Mega)
   Serial.begin(57600); //Main serial port for console output
   
@@ -72,7 +79,7 @@ void setup() {
   while (x == 0.0){
     unsigned long tempMillis = millis();
     if((tempMillis - tempPrevMillis) >= 500){
-      tempPrevMillis = tempMillis;  // Remember the time
+      tempPrevMillis = tempMillis;
       Serial.print(".");
       getCoordinates();
       //blink(1);
@@ -84,7 +91,7 @@ void setup() {
 }
 
 void loop() {
-  analogWrite(led, 250);
+  
   //digitalWrite(led, HIGH);
   //if(digitalRead(led)==HIGH) Serial.println("1111111111111");
   unsigned long tempMillis = millis();
@@ -116,7 +123,6 @@ void loop() {
     }
     ee=1;
   }
-
   
   
 }
@@ -215,6 +221,7 @@ void getSwState() {
   noInterrupts();
   wpCHRaw = pulseIn(ch1, HIGH, 25000);
   svpCHRaw = pulseIn(ch2, HIGH, 25000);
+  ledCHRaw = pulseIn(ch3, HIGH, 25000);
   interrupts();
 
   for (int i = 0; i < 2; i++) {
@@ -230,6 +237,14 @@ void getSwState() {
       break;
     }
   }
+
+  if(ledCHRaw>1200){
+    analogWrite(led, 250);
+  }
+  else if(ledCHRaw<1000){
+    analogWrite(led, 0);
+  }
+  
   Serial.println(wpCH);
 }
 

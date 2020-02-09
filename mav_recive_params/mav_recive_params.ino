@@ -4,34 +4,32 @@
 #define RXpin 2
 #define TXpin 3
 SoftwareSerial Serial1(RXpin, TXpin); // sets up serial communication on pins 3 and 2
- 
+
+byte sats = 0;
 void setup() {
   Serial1.begin(57600); //RXTX from Pixhawk (Port 19,18 Arduino Mega)
   Serial.begin(57600); //Main serial port for console output
  
-request_datastream();
+//request_datastream();
  
 }
  
 void loop() {
  
-MavLink_receive();
- 
+getNumOfSats();
+ Serial.print(sats);
 }
  
 //function called by arduino to read any MAVlink messages sent by serial communication from flight controller to arduino
-void MavLink_receive()
+void getNumOfSats()
   { 
   mavlink_message_t msg;
   mavlink_status_t status;
-
   while(Serial1.available())
   {
     uint8_t c= Serial1.read();
-    //Get new message
     if(mavlink_parse_char(MAVLINK_COMM_0, c, &msg, &status))
     {
-    //Handle new message from autopilot
       switch(msg.msgid)
       {
         case MAVLINK_MSG_ID_GPS_RAW_INT:
@@ -44,7 +42,7 @@ void MavLink_receive()
         Serial.print("GPS Longitude: ");Serial.println(packet.lon);
         Serial.print("GPS Speed: ");Serial.println(packet.vel);
         Serial.print("Sats Visible: ");Serial.println(packet.satellites_visible);
-       
+        sats = packet.fix_type;
       }
       break;
  
