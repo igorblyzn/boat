@@ -68,7 +68,7 @@ void setup() {
   pinMode(ch3, INPUT);
   pinMode(buzzer, OUTPUT);
   pinMode(led, OUTPUT);
-  delay(1000);
+  delay(10000);
   beep(1);
   Serial1.begin(57600); //RXTX from Pixhawk (Port 19,18 Arduino Mega)
   Serial.begin(57600); //Main serial port for console output
