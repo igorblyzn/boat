@@ -54,7 +54,8 @@ MyObject eeprom;
 #define count 2
 
 unsigned long tempPrevMillis = 0;
-
+unsigned long tempMillis;
+unsigned long tempModeMillis;
 bool modeAuto = false;
 unsigned long tempModePrevMillis = 0;
 byte ee = 1;
@@ -68,14 +69,14 @@ void setup() {
   pinMode(ch3, INPUT);
   pinMode(buzzer, OUTPUT);
   pinMode(led, OUTPUT);
-  delay(10000);
+  delay(15000);
   beep(1);
   Serial1.begin(57600); //RXTX from Pixhawk (Port 19,18 Arduino Mega)
   Serial.begin(57600); //Main serial port for console output
   
   EEPROM.get(0, eeprom);
   mission_count();
-
+  printAllPoints();
   while (x == 0.0){
     unsigned long tempMillis = millis();
     if((tempMillis - tempPrevMillis) >= 500){
@@ -92,14 +93,12 @@ void setup() {
 
 void loop() {
   
-  //digitalWrite(led, HIGH);
-  //if(digitalRead(led)==HIGH) Serial.println("1111111111111");
-  unsigned long tempMillis = millis();
-  if((tempMillis - tempPrevMillis) > 400){
+  tempMillis = millis();
+  if((tempMillis - tempPrevMillis) > 800){
     tempPrevMillis = tempMillis;
-    //blink(2);
     getSwState();
     if (wpCH != startCH1) {
+      Serial.print("put ");
       EEPROM.get( 0, eeprom );
       writeWP();
       startCH1 = wpCH;
@@ -107,7 +106,7 @@ void loop() {
       printAllPoints();
     }
     if (saveCH > 1) {
-      Serial.println("Get");
+      Serial.print("save ");
       EEPROM.get( 0, eeprom );
       getCoordinates();
       saveWaipoint();
@@ -115,8 +114,9 @@ void loop() {
       beep(2);
     }
   }
-  unsigned long tempModeMillis = millis();
-   if((tempModeMillis - tempModePrevMillis) > 5000){
+  tempModeMillis = millis();
+  if((tempModeMillis - tempModePrevMillis) > 5200){
+    //Serial.println("mode for lihts");
     tempModePrevMillis = tempModeMillis;
     while(ee==1){
       getMode();
@@ -179,7 +179,7 @@ void pushWpAndCheck(){
             mavlink_mission_ack_t missionack;
             mavlink_msg_mission_ack_decode(&msg, &missionack);
             if (missionack.type == 0) {
-              Serial.println("Upload OK");
+              Serial.println("OK");
               temp = 1;
             }
           }
@@ -203,8 +203,9 @@ void create_waypoint() {
   uint16_t seq = 1; // Sequence number
   mavlink_message_t msg;
   uint8_t buf[MAVLINK_MAX_PACKET_LEN];
-  mavlink_msg_mission_item_pack(_system_id, _component_id, &msg, _target_system, _target_component, seq, frame, command, current, autocontinue, 0, 0, 0, 0, eeprom.xyz[wpCH][0], eeprom.xyz[wpCH][1], eeprom.xyz[wpCH][2]);
+  mavlink_msg_mission_item_pack(_system_id, _component_id, &msg, _target_system, _target_component, seq, frame, command, current, autocontinue, 0, 0, 0, 0, eeprom.xyz[wpCH-1][0], eeprom.xyz[wpCH-1][1], eeprom.xyz[wpCH-1][2]);
   uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
+  //Serial.println(eeprom.xyz[wpCH-1][2]);
   Serial1.write(buf, len);
 }
 
