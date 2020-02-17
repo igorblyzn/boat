@@ -71,28 +71,31 @@ void setup() {
   pinMode(led, OUTPUT);
   delay(15000);
   beep(1);
-  Serial1.begin(57600); //RXTX from Pixhawk (Port 19,18 Arduino Mega)
-  Serial.begin(57600); //Main serial port for console output
+  Serial1.begin(57600);
+  Serial.begin(57600);
   
   EEPROM.get(0, eeprom);
+  
+  getSwState();
   mission_count();
+  
+  
   printAllPoints();
   while (x == 0.0){
-    unsigned long tempMillis = millis();
+    tempMillis = millis();
     if((tempMillis - tempPrevMillis) >= 500){
       tempPrevMillis = tempMillis;
-      Serial.print(".");
       getCoordinates();
-      //blink(1);
+      Serial.print(".");
     }
   }
+  //getMode();
   beep(2);
-  getMode();
   
 }
 
 void loop() {
-  
+  ee++;
   tempMillis = millis();
   if((tempMillis - tempPrevMillis) > 800){
     tempPrevMillis = tempMillis;
@@ -103,7 +106,7 @@ void loop() {
       writeWP();
       startCH1 = wpCH;
       beep(1);
-      printAllPoints();
+      //printAllPoints();
     }
     if (saveCH > 1) {
       Serial.print("save ");
@@ -113,16 +116,19 @@ void loop() {
       writeWP();
       beep(2);
     }
+    if(ee>6){
+      getMode();
+      ee=1;
+    }
   }
-  tempModeMillis = millis();
-  if((tempModeMillis - tempModePrevMillis) > 5200){
-    //Serial.println("mode for lihts");
+  /*tempModeMillis = millis();
+  if((tempModeMillis - tempModePrevMillis) > 5150){
     tempModePrevMillis = tempModeMillis;
     while(ee==1){
       getMode();
     }
     ee=1;
-  }
+  }*/
   
   
 }
@@ -272,13 +278,11 @@ void beep(byte num){
     while((millis() - digitalMillis < OffTime)){
       digitalWrite(buzzer, HIGH);
       analogWrite(led, 254);
-      //digitalWrite(led, HIGH);
     }
     digitalMillis = millis();
     while((millis() - digitalMillis < OnTime)){
       digitalWrite(buzzer, LOW);
       analogWrite(led, 0);
-      //digitalWrite(led, LOW);
     }
   }
 }
@@ -292,12 +296,10 @@ void doDigital(byte pin,byte num){
     digitalMillis = millis();
     while((millis() - digitalMillis < OffTime)){
       analogWrite(led, 250);
-      //digitalWrite(pin, HIGH);
     }
     digitalMillis = millis();
     while((millis() - digitalMillis < OnTime)){
       analogWrite(led, 0);
-      //digitalWrite(led, LOW);
     }
   }
 }
@@ -315,8 +317,7 @@ void getMode(){
             switch(hb.custom_mode) {
               case 4:{
                 //Serial.println("Hold");
-                if(modeAuto)
-                  beep(15);
+                if(modeAuto)beep(15);
                 modeAuto = false;
               }
               break;
@@ -329,7 +330,6 @@ void getMode(){
               }
               break;
             }
-            ee = 0;
           }
           break;
        }
