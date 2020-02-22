@@ -58,7 +58,7 @@ unsigned long tempMillis;
 unsigned long tempModeMillis;
 bool modeAuto = false;
 unsigned long tempModePrevMillis = 0;
-byte ee = 1;
+byte ee = 0;
 unsigned long ledMillis;
 
 byte sats = 0;
@@ -95,12 +95,18 @@ void setup() {
 }
 
 void loop() {
-  ee++;
+  
   tempMillis = millis();
   if((tempMillis - tempPrevMillis) > 800){
+    ee++;
+    /*if(ee>6){
+      getMode();
+      ee=0;
+    }*/
     tempPrevMillis = tempMillis;
     getSwState();
     if (wpCH != startCH1) {
+      ee=0;
       Serial.print("put ");
       EEPROM.get( 0, eeprom );
       writeWP();
@@ -109,6 +115,7 @@ void loop() {
       //printAllPoints();
     }
     if (saveCH > 1) {
+      ee=0;
       Serial.print("save ");
       EEPROM.get( 0, eeprom );
       getCoordinates();
@@ -116,21 +123,24 @@ void loop() {
       writeWP();
       beep(2);
     }
+    /*tempModeMillis = millis();
+    if((tempModeMillis - tempModePrevMillis) > 5150){
+      tempModePrevMillis = tempModeMillis;
+      while(ee==7){
+        getMode();
+      }
+      ee=0;
+    }*/
     if(ee>6){
-      getMode();
-      ee=1;
+      while(ee==7){
+        getMode();
+      }
+      ee=0;
     }
   }
-  /*tempModeMillis = millis();
-  if((tempModeMillis - tempModePrevMillis) > 5150){
-    tempModePrevMillis = tempModeMillis;
-    while(ee==1){
-      getMode();
-    }
-    ee=1;
-  }*/
   
   
+        
 }
 
 void writeWP() {
@@ -314,19 +324,24 @@ void getMode(){
         case MAVLINK_MSG_ID_HEARTBEAT:{  // #0: Heartbeat
             mavlink_heartbeat_t hb;
             mavlink_msg_heartbeat_decode(&msg, &hb);
+            Serial.print("|| ");Serial.println(hb.custom_mode);
             switch(hb.custom_mode) {
               case 4:{
                 //Serial.println("Hold");
                 if(modeAuto)beep(15);
                 modeAuto = false;
+                ee=0;
               }
               break;
-              case 10:
+              case 10:{
                 //Serial.println("Auto");
                 modeAuto = true;
+                ee=0;
+              }
               break;
               default:{
                 modeAuto = false;
+                ee=0;
               }
               break;
             }
