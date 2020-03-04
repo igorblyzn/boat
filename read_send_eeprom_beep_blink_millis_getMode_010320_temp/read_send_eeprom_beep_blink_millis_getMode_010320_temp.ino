@@ -3,31 +3,24 @@
 #include <EEPROM.h>
 
 /* digital OUTPUT */
-
-
 unsigned long digitalMillis;
 #define OnTime 500
 #define OffTime 200  
-
 /* digital OUTPUT */
 
 #define RXpin 2
 #define TXpin 3
 #define buzzer 5
-#define ch1 8
-#define ch2 9
-#define ch3 10
+#define ch1 8//WP1
+#define ch4 12//WP2
+#define ch2 9//Save
+#define ch3 10//lights
 #define led 11//LED_BUILTIN
 SoftwareSerial Serial1(RXpin, TXpin);
 
 byte temp = 0;
 byte wpCH = 1;
 byte saveCH = 0;
-int wpCHRaw;
-int svpCHRaw;
-int ledCHRaw;
-
-
 
 byte startCH1 = 0;
 byte startCH2 = 0;
@@ -36,12 +29,14 @@ float x = 0.0;
 float y;
 int z;
 
-int chArray[9] = {900, 1000, 1200, 1300, 1450, 1750, 1800, 1900, 2020};
-int svArray[2] = {900, 2020};
+int chArray[3] = {1100, 1450, 2020};
+
 #define rangeCH 70
 
 struct MyObject{
-  float xyz[9][3];
+  float xa[9];
+  float ya[9];
+  int za[9];
 };
 
 MyObject eeprom;
@@ -61,29 +56,32 @@ unsigned long tempMillis;
 unsigned long tempModeMillis;
 bool modeAuto = false;
 unsigned long tempModePrevMillis = 0;
-byte ee = 0;
 unsigned long ledMillis;
 
-byte sats = 0;
-
 void setup() {
+  delay(15000);
   pinMode(ch1, INPUT);
   pinMode(ch2, INPUT);
   pinMode(ch3, INPUT);
   pinMode(buzzer, OUTPUT);
   pinMode(led, OUTPUT);
-  delay(15000);
   beep(1);
   Serial1.begin(57600);
-  Serial.begin(57600);
-  
   EEPROM.get(0, eeprom);
   
-  //getSwState();
-  printAllPoints();
-  
   mission_count();
- 
+  while (x == 0.0){
+    tempMillis = millis();
+    if((tempMillis - tempPrevMillis) >= 800){
+      getSwState();
+      tempPrevMillis = tempMillis;
+      getCoordinates();
+    }
+  }
+  beep(1);
+  delay(15000);
+  x=0.0;
+  mission_count();
   while (x == 0.0){
     tempMillis = millis();
     if((tempMillis - tempPrevMillis) >= 800){
@@ -93,43 +91,28 @@ void setup() {
     }
   }
   beep(2);
+  
 }
 
 void loop() {
   
   tempMillis = millis();
   if((tempMillis - tempPrevMillis) > 800){
-    ee++;
-
     tempPrevMillis = tempMillis;
     getSwState();
     if (wpCH != startCH1) {
-      ee=0;
-      Serial.print("put ");
       EEPROM.get( 0, eeprom );
       writeWP();
       startCH1 = wpCH;
       beep(1);
-      printAllPoints();
     }
-    if (saveCH > 1) {
-      ee=0;
-      Serial.print("save ");
+    if (saveCH > 0) {
       EEPROM.get( 0, eeprom );
       getCoordinates();
       saveWaipoint();
       writeWP();
       beep(2);
-      printAllPoints();
     }
-/*
-    if(ee>6){
-      while(ee==7){
-        getMode();
-      }
-      ee=0;
-    }
-    */
   }
 }
 
@@ -139,16 +122,13 @@ void writeWP() {
     pushWpAndCheck();
   }
   temp = 0;
-  //beep(1);
 }
 
 void getCoordinates() {
-
   mavlink_message_t msg;
   mavlink_status_t status;
   while (Serial1.available()) {
     uint8_t c = Serial1.read();
-    Serial.println(c);
     if (mavlink_parse_char(MAVLINK_COMM_0, c, &msg, &status)) {
       switch (msg.msgid) {
         case MAVLINK_MSG_ID_GLOBAL_POSITION_INT: {
@@ -157,7 +137,6 @@ void getCoordinates() {
             x = packet.lat / 10000000.0f;
             y = packet.lon / 10000000.0f;
             z = packet.alt / 1000.0f;
-            Serial.println(x);
           }
           break;
       }
@@ -177,10 +156,10 @@ void pushWpAndCheck(){
             mavlink_mission_request_t missionreq;
             mavlink_msg_mission_request_decode(&msg, &missionreq);
             if (missionreq.seq == 0) {
-              create_home();
+              create_WP(0,eeprom.xa[0], eeprom.ya[0], eeprom.za[0]);
             }
             if (missionreq.seq == 1) {
-              create_waypoint();
+              create_WP(1,eeprom.xa[wpCH], eeprom.ya[wpCH], eeprom.za[wpCH]);
             }
           }
           break;
@@ -188,7 +167,6 @@ void pushWpAndCheck(){
             mavlink_mission_ack_t missionack;
             mavlink_msg_mission_ack_decode(&msg, &missionack);
             if (missionack.type == 0) {
-              Serial.println("OK");
               temp = 1;
             }
           }
@@ -199,23 +177,11 @@ void pushWpAndCheck(){
 
 }
 
-void create_home() {
-  uint16_t seq = 0; // Sequence number
+void create_WP(byte seq, float x, float y, int z) {
   mavlink_message_t msg;
   uint8_t buf[MAVLINK_MAX_PACKET_LEN];
-  mavlink_msg_mission_item_pack(_system_id, _component_id, &msg, _target_system, _target_component, seq, frame, command, current, autocontinue, 0, 0, 0, 0, eeprom.xyz[0][0], eeprom.xyz[0][1], eeprom.xyz[0][2]);
+  mavlink_msg_mission_item_pack(_system_id, _component_id, &msg, _target_system, _target_component, seq, frame, command, current, autocontinue, 0, 0, 0, 0, x, y, z);
   uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
-  Serial1.write(buf, len);
-}
-
-void create_waypoint() {
-  uint16_t seq = 1; // Sequence number
-  mavlink_message_t msg;
-  uint8_t buf[MAVLINK_MAX_PACKET_LEN];
-  Serial.print(eeprom.xyz[wpCH-1][0],8);Serial.print(" ");Serial.print(eeprom.xyz[wpCH-1][1],8);Serial.print(" ");Serial.print(eeprom.xyz[wpCH-1][2]);
-  mavlink_msg_mission_item_pack(_system_id, _component_id, &msg, _target_system, _target_component, seq, frame, command, current, autocontinue, 0, 0, 0, 0, eeprom.xyz[wpCH-1][0], eeprom.xyz[wpCH-1][1], eeprom.xyz[wpCH-1][2]);
-  uint16_t len = mavlink_msg_to_send_buffer(buf, &msg);
-  //Serial.println(eeprom.xyz[wpCH-1][2]);
   Serial1.write(buf, len);
 }
 
@@ -230,23 +196,64 @@ void mission_count() {
 void getSwState() {
 
   noInterrupts();
-  wpCHRaw = pulseIn(ch1, HIGH, 25000);
-  svpCHRaw = pulseIn(ch2, HIGH, 25000);
-  ledCHRaw = pulseIn(ch3, HIGH, 25000);
+  int wpCHRaw = pulseIn(ch1, HIGH, 25000);
+  int svpCHRaw = pulseIn(ch2, HIGH, 25000);
+  int ledCHRaw = pulseIn(ch3, HIGH, 25000);
+  int wpCHRaw2 = pulseIn(ch4, HIGH, 25000);
   interrupts();
 
-  for (int i = 0; i < 2; i++) {
-    if ((svpCHRaw - svArray[i]) < rangeCH) {
-      saveCH = i + 1;
+  if(svpCHRaw>1600){
+    saveCH = 1;
+  }
+  else saveCH = 0;
+   
+  int wpCH2;
+
+  for (byte i = 0; i < 3; i++) {
+    if ((wpCHRaw - chArray[i]) < rangeCH) {
+      wpCH = i;
       break;
     }
   }
 
-  for (int i = 0; i < 9; i++) {
-    if ((wpCHRaw - chArray[i]) < rangeCH) {
-      wpCH = i + 1;
+  for (byte i = 0; i < 3; i++) {
+    if ((wpCHRaw2 - chArray[i]) < rangeCH) {
+      wpCH2 = i;
       break;
     }
+  }
+
+  switch (wpCH){
+    case 0:
+      switch (wpCH2){
+        case 0: wpCH = 0;
+        break;
+        case 1: wpCH = 1;
+        break;
+        case 2: wpCH = 2;
+        break;
+      }
+      break;
+    case 1:
+      switch (wpCH2){
+        case 0: wpCH = 3;
+        break;
+        case 1: wpCH = 4;
+        break;
+        case 2: wpCH = 5;
+        break;
+      }
+      break;
+    case 2:
+      switch (wpCH2){
+        case 0: wpCH = 6;
+        break;
+        case 1: wpCH = 7;
+        break;
+        case 2: wpCH = 8;
+        break;
+      }
+      break;
   }
 
   if(ledCHRaw>1200){
@@ -256,29 +263,20 @@ void getSwState() {
     analogWrite(led, 0);
   }
   
-  Serial.print(wpCH);
+
+
 }
 
 void saveWaipoint() {
-  eeprom.xyz[wpCH - 1][0] = x;
-  eeprom.xyz[wpCH - 1][1] = y;
-  eeprom.xyz[wpCH - 1][2] = z;
+  eeprom.xa[wpCH] = x;
+  eeprom.ya[wpCH] = y;
+  eeprom.za[wpCH] = z;
   EEPROM.put(0, eeprom);
-  //beep(1);
-}
-
-void printAllPoints() {
-  for (int i = 0; i < 9; i++) {
-    for (int j = 0; j < 3; j++) {
-      Serial.print(eeprom.xyz[i][j],8); Serial.print(" ");
-    }
-    Serial.println();
-  }
 }
 
 void beep(byte num){
   
-  for (int i = 0; i < num; i++){
+  for (byte i = 0; i < num; i++){
     digitalMillis = millis();
     while((millis() - digitalMillis < OffTime)){
       digitalWrite(buzzer, HIGH);
@@ -288,61 +286,6 @@ void beep(byte num){
     while((millis() - digitalMillis < OnTime)){
       digitalWrite(buzzer, LOW);
       analogWrite(led, 0);
-    }
-  }
-}
-
-void blink(byte num){
-  doDigital(led,num);
-}
-
-void doDigital(byte pin,byte num){
-  for (int i = 0; i < num; i++){
-    digitalMillis = millis();
-    while((millis() - digitalMillis < OffTime)){
-      analogWrite(led, 250);
-    }
-    digitalMillis = millis();
-    while((millis() - digitalMillis < OnTime)){
-      analogWrite(led, 0);
-    }
-  }
-}
-
-void getMode(){
-  mavlink_message_t msg;
-  mavlink_status_t status;
-  while(Serial1.available()) {
-    uint8_t c = Serial1.read();
-    if(mavlink_parse_char(MAVLINK_COMM_0, c, &msg, &status)) {
-      switch(msg.msgid) {
-        case MAVLINK_MSG_ID_HEARTBEAT:{  // #0: Heartbeat
-            mavlink_heartbeat_t hb;
-            mavlink_msg_heartbeat_decode(&msg, &hb);
-            Serial.print("|| ");Serial.println(hb.custom_mode);
-            switch(hb.custom_mode) {
-              case 4:{
-                //Serial.println("Hold");
-                if(modeAuto)beep(5);
-                modeAuto = false;
-                ee=0;
-              }
-              break;
-              case 10:{
-                //Serial.println("Auto");
-                modeAuto = true;
-                ee=0;
-              }
-              break;
-              default:{
-                modeAuto = false;
-                ee=0;
-              }
-              break;
-            }
-          }
-          break;
-       }
     }
   }
 }

@@ -1,7 +1,9 @@
 #include <EEPROM.h>
 
 struct MyObject{
-  float xyz[9][3];
+    float x[9];
+  float y[9];
+  int z[9];
 };
 
 void setup(){
@@ -17,10 +19,7 @@ void setup(){
   Serial.println( "Read custom object from EEPROM: " );
 
    for (int i = 0; i < 9; i++) {
-    for (int j = 0; j < 3; j++) {
-      Serial.print(eeprom.xyz[i][j],7); Serial.print(" ");
-    }
-    Serial.println();
+    Serial.print(eeprom.x[i],7); Serial.print(" ");Serial.print(eeprom.y[i],7); Serial.print(" ");Serial.println(eeprom.z[i]);
   }
 }
 
